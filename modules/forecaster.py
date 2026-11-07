@@ -64,6 +64,68 @@ def _compute_metrics(
     }
 
 
+def evaluate_model_on_validation(
+    arg1: Any,
+    arg2: Any,
+    horizon: Optional[int] = None,
+    model_name: str = "holt_winters",
+    target_col: str = "units_sold",
+    date_col: str = "date",
+) -> Tuple[Any, np.ndarray, Dict[str, float]]:
+    """Evalúa un modelo de pronóstico sobre una partición de validación.
+
+    Soporta dos firmas:
+    1. evaluate_model_on_validation(model_name, series, horizon=...)
+    2. evaluate_model_on_validation(train_data, val_data, model_name=...)
+    """
+    if isinstance(arg1, str):
+        # Firma 1: (model_name, series, horizon=...)
+        m_name = arg1
+        series = pd.Series(arg2, dtype=float).reset_index(drop=True)
+        h = horizon if horizon is not None else 14
+
+        train_size, val_size = _resolve_validation_split(series, h)
+        train_series = series.iloc[:train_size]
+        val_series = series.iloc[train_size : train_size + val_size]
+        dates = None
+    else:
+        # Firma 2: (train_data, val_data, model_name=...)
+        m_name = model_name
+        if isinstance(arg1, pd.DataFrame):
+            train_series = arg1[target_col].astype(float).reset_index(drop=True)
+            dates = (
+                pd.DatetimeIndex(pd.to_datetime(arg1[date_col], errors="coerce"))
+                if date_col in arg1.columns
+                else None
+            )
+        else:
+            train_series = pd.Series(arg1, dtype=float).reset_index(drop=True)
+            dates = None
+
+        if isinstance(arg2, pd.DataFrame):
+            val_series = arg2[target_col].astype(float).reset_index(drop=True)
+        else:
+            val_series = pd.Series(arg2, dtype=float).reset_index(drop=True)
+        h = len(val_series)
+
+    if m_name == "holt_winters" and ExponentialSmoothing is None:
+        m_name = "moving_average"
+
+    forecast = _fit_model_and_predict(m_name, train_series, h, dates=dates)
+
+    if len(forecast) > len(val_series):
+        forecast = forecast[: len(val_series)]
+    elif len(forecast) < len(val_series):
+        pad_val = forecast[-1] if len(forecast) > 0 else 0.0
+        forecast = np.pad(
+            forecast, (0, len(val_series) - len(forecast)), mode="constant", constant_values=pad_val
+        )
+
+    metrics = _compute_metrics(val_series.to_numpy(), forecast, train_series.to_numpy())
+    model = {"model_name": m_name, "train_len": len(train_series)}
+    return model, forecast, metrics
+
+
 def _resolve_validation_split(series: pd.Series, horizon: int) -> Tuple[int, int]:
     n = len(series)
     default_val = max(14, min(60, n // 5))
@@ -154,7 +216,10 @@ def xgboost_forecast(train_series: pd.Series, horizon: int) -> np.ndarray:
 
 
 def _fit_model_and_predict(
-    model_name: str, train_series: pd.Series, horizon: int, dates: Optional[pd.DatetimeIndex] = None
+    model_name: str,
+    train_series: pd.Series,
+    horizon: int,
+    dates: Optional[pd.DatetimeIndex] = None,
 ) -> np.ndarray:
     if model_name == "naive":
         return naive_forecast(train_series, horizon)
@@ -213,10 +278,12 @@ def forecast_sku(
     series = sku_df["units_sold"].astype(float).reset_index(drop=True)
 
     selected_model = "holt_winters" if ExponentialSmoothing is not None else "moving_average"
-    
+
     future_forecast = _fit_model_and_predict(selected_model, series, horizon)
     history_dates = pd.date_range(start="2023-01-01", periods=len(series), freq="D")
-    future_dates = pd.date_range(start=history_dates[-1] + pd.Timedelta(days=1), periods=horizon, freq="D")
+    future_dates = pd.date_range(
+        start=history_dates[-1] + pd.Timedelta(days=1), periods=horizon, freq="D"
+    )
 
     lower, upper = _build_confidence_intervals(future_forecast, series)
 
