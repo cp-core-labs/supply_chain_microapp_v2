@@ -200,11 +200,11 @@ def build_risk_alerts(
             alerts.append(
                 {
                     "scope": scope,
-                    "sku": sku,
+                    "sku": sku,  # noqa: B023
                     "alert_type": alert_type,
                     "severity": severity,
                     "message": message,
-                    "confidence": confidence,
+                    "confidence": confidence,  # noqa: B023
                     "provisional": bool(is_provisional),
                 }
             )

@@ -254,9 +254,9 @@ def build_inventory_plan(
     df["avg_lead_time_days"] = pd.to_numeric(df["avg_lead_time_days"], errors="coerce").fillna(0.0)
     df["lead_time_std_days"] = pd.to_numeric(df["lead_time_std_days"], errors="coerce").fillna(0.0)
     df["avg_unit_price"] = pd.to_numeric(df["avg_unit_price"], errors="coerce").fillna(0.0)
-    df["service_level_target"] = pd.to_numeric(
-        df["service_level_target"], errors="coerce"
-    ).fillna(0.95)
+    df["service_level_target"] = pd.to_numeric(df["service_level_target"], errors="coerce").fillna(
+        0.95
+    )
 
     df["annual_demand"] = df["avg_daily_demand"] * 365.0
     df["annual_dollar_usage"] = df["annual_demand"] * df["avg_unit_price"]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+# ruff: noqa: E402
 import sys
 from pathlib import Path
 
@@ -14,8 +15,6 @@ from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import streamlit as st
 
-from supply_chain_microapp.storage import initialize_database
-
 from modules.forecast_jobs import (
     build_forecast_job_id,
     forecast_dataframe_from_job,
@@ -23,12 +22,13 @@ from modules.forecast_jobs import (
     initialize_forecast_jobs,
     submit_forecast_job,
 )
+from modules.recommendation_engine import build_recommendations
 from modules.risk_monitor import (
     build_risk_alerts,
     load_open_risk_alerts,
     persist_risk_alerts,
 )
-from modules.recommendation_engine import build_recommendations
+from supply_chain_microapp.storage import initialize_database
 
 initialize_database()
 initialize_forecast_jobs()

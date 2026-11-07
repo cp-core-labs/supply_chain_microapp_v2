@@ -4,7 +4,6 @@ import hashlib
 import sqlite3
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
 
 import pandas as pd
 
