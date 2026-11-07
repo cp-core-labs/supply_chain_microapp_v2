@@ -48,7 +48,6 @@ Use the included sample data to explore SKU-level forecasts, replenishment indic
 | **Inventory planning** | Explore ABC/VED classification, safety stock, reorder points, EOQ estimates, and coverage indicators. |
 | **Operational risk** | Review risk scores and alerts for potential stockout, low coverage, lead-time, and data-quality concerns. |
 | **Confidence signals** | See basic data-quality assessments alongside risk alerts to support cautious interpretation. |
-| **Confidence signals** | See basic data-quality assessments alongside risk alerts to support cautious interpretation. |
 | **Recommendations** | Review suggested next steps, such as validating data or reviewing replenishment and supplier policies. |
 | **Scenario analysis** | Explore how demand and lead-time changes may affect inventory planning indicators. |
 | **Exports** | Download selected planning and recommendation data as CSV. |
