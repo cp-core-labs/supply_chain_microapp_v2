@@ -48,4 +48,5 @@ data/*.csv
 !data/suppliers_lead_time.csv
 
 # Streamlit
-.streamlit/
+.streamlit/*
+!.streamlit/config.toml
