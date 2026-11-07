@@ -71,7 +71,7 @@ def evaluate_model_on_validation(
     model_name: str = "holt_winters",
     target_col: str = "units_sold",
     date_col: str = "date",
-) -> Tuple[Any, np.ndarray, Dict[str, float]]:
+) -> Dict[str, Any]:
     """Evalúa un modelo de pronóstico sobre una partición de validación.
 
     Soporta dos firmas:
@@ -123,7 +123,12 @@ def evaluate_model_on_validation(
 
     metrics = _compute_metrics(val_series.to_numpy(), forecast, train_series.to_numpy())
     model = {"model_name": m_name, "train_len": len(train_series)}
-    return model, forecast, metrics
+
+    return {
+        "model": model,
+        "forecast": forecast,
+        "metrics": metrics,
+    }
 
 
 def _resolve_validation_split(series: pd.Series, horizon: int) -> Tuple[int, int]:
@@ -270,82 +275,3 @@ def forecast_sku(
     sku_df = sku_df.copy()
     sku_df["date"] = pd.to_datetime(sku_df["date"], errors="coerce")
     sku_df = sku_df.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
-
-    if sku_df.empty:
-        raise ValueError("El DataFrame del SKU está vacío.")
-
-    sku_code = str(sku_df["sku"].iloc[0]) if "sku" in sku_df.columns else "UNKNOWN_SKU"
-    series = sku_df["units_sold"].astype(float).reset_index(drop=True)
-
-    selected_model = "holt_winters" if ExponentialSmoothing is not None else "moving_average"
-
-    future_forecast = _fit_model_and_predict(selected_model, series, horizon)
-    history_dates = pd.date_range(start="2023-01-01", periods=len(series), freq="D")
-    future_dates = pd.date_range(
-        start=history_dates[-1] + pd.Timedelta(days=1), periods=horizon, freq="D"
-    )
-
-    lower, upper = _build_confidence_intervals(future_forecast, series)
-
-    future_df = pd.DataFrame(
-        {
-            "date": future_dates,
-            "sku": sku_code,
-            "forecast_units": np.round(future_forecast, 2),
-            "lower_bound": np.round(lower, 2),
-            "upper_bound": np.round(upper, 2),
-            "selected_model": selected_model,
-        }
-    )
-
-    history_df = sku_df[["date", "sku", "units_sold"]].copy()
-    history_df = history_df.rename(columns={"units_sold": "forecast_units"})
-    history_df["lower_bound"] = np.nan
-    history_df["upper_bound"] = np.nan
-    history_df["selected_model"] = "historical"
-
-    combined = pd.concat([history_df, future_df], ignore_index=True, sort=False)
-    combined = combined.sort_values("date").reset_index(drop=True)
-
-    dummy_metrics = {"mae": 0.0, "rmse": 0.0, "mape": 0.0, "mase": 0.0}
-
-    return {
-        "sku": sku_code,
-        "selected_model": selected_model,
-        "forecast_df": combined,
-        "metrics": dummy_metrics,
-        "confidence_interval": {
-            "lower": lower,
-            "upper": upper,
-        },
-        "all_model_evaluations": [],
-    }
-
-
-def forecast_all_skus(
-    daily_sales_df: pd.DataFrame,
-    horizon: int = 30,
-    candidate_models: Optional[List[str]] = None,
-) -> pd.DataFrame:
-    daily_sales_df = daily_sales_df.copy()
-    daily_sales_df["date"] = pd.to_datetime(daily_sales_df["date"], errors="coerce")
-    daily_sales_df = (
-        daily_sales_df.dropna(subset=["date"]).sort_values(["sku", "date"]).reset_index(drop=True)
-    )
-
-    if daily_sales_df.empty:
-        raise ValueError("No hay datos de ventas para forecast.")
-
-    all_forecasts = []
-    for sku in pd.unique(daily_sales_df["sku"].dropna()):
-        sku_df = daily_sales_df[daily_sales_df["sku"] == sku].copy()
-        result = forecast_sku(sku_df, horizon=horizon, candidate_models=candidate_models)
-        forecast_df = result["forecast_df"].copy()
-        forecast_df["selected_model"] = str(result["selected_model"])
-        all_forecasts.append(forecast_df)
-
-    if not all_forecasts:
-        return pd.DataFrame()
-
-    combined = pd.concat(all_forecasts, ignore_index=True)
-    return combined.sort_values(["sku", "date"]).reset_index(drop=True)
