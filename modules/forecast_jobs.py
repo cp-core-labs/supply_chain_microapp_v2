@@ -29,8 +29,7 @@ def initialize_forecast_jobs() -> None:
     """Crea la tabla de trabajos de forecast si todavía no existe."""
     conn = _connect()
     try:
-        conn.execute(
-            """
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS forecast_jobs (
                 job_id TEXT PRIMARY KEY,
                 status TEXT NOT NULL,
@@ -40,14 +39,11 @@ def initialize_forecast_jobs() -> None:
                 error_message TEXT,
                 result_json TEXT
             )
-            """
-        )
-        conn.execute(
-            """
+            """)
+        conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_forecast_jobs_status
             ON forecast_jobs(status)
-            """
-        )
+            """)
         conn.commit()
     finally:
         conn.close()

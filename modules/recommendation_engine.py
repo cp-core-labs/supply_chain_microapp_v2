@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pandas as pd
 
-
 RECOMMENDATION_COLUMNS = [
     "sku",
     "product_name",
@@ -67,19 +66,11 @@ def build_recommendations(inventory_df: pd.DataFrame) -> pd.DataFrame:
             has_actual_inventory = current_inventory is not None
             coverage_days = None
 
-            if (
-                has_actual_inventory
-                and demand is not None
-                and demand > 0
-            ):
+            if has_actual_inventory and demand is not None and demand > 0:
                 coverage_days = max(0.0, current_inventory / demand)
 
             # Solo se compara cobertura contra lead time si hay stock real.
-            if (
-                coverage_days is not None
-                and lead_time is not None
-                and coverage_days < lead_time
-            ):
+            if coverage_days is not None and lead_time is not None and coverage_days < lead_time:
                 action = "EXPEDITE_OR_REVIEW"
                 urgency = "HIGH"
                 reason = (
@@ -87,10 +78,7 @@ def build_recommendations(inventory_df: pd.DataFrame) -> pd.DataFrame:
                     f"menos que el lead time de {lead_time:.1f} días."
                 )
 
-            elif (
-                stockout_probability is not None
-                and stockout_probability >= 0.30
-            ):
+            elif stockout_probability is not None and stockout_probability >= 0.30:
                 action = "REVIEW_REPLENISHMENT"
                 urgency = "HIGH"
                 reason = (
@@ -98,10 +86,7 @@ def build_recommendations(inventory_df: pd.DataFrame) -> pd.DataFrame:
                     f"({stockout_probability:.0%}). Revisa la reposición."
                 )
 
-            elif (
-                risk_score is not None
-                and risk_score >= 60
-            ):
+            elif risk_score is not None and risk_score >= 60:
                 action = "REVIEW_SUPPLIER_AND_POLICY"
                 urgency = "MEDIUM"
                 reason = (
@@ -109,10 +94,7 @@ def build_recommendations(inventory_df: pd.DataFrame) -> pd.DataFrame:
                     "Revisa lead time, proveedor y política de inventario."
                 )
 
-            elif (
-                stockout_probability is not None
-                and stockout_probability >= 0.15
-            ):
+            elif stockout_probability is not None and stockout_probability >= 0.15:
                 action = "MONITOR_CLOSER"
                 urgency = "MEDIUM"
                 reason = (

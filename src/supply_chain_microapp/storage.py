@@ -26,8 +26,7 @@ def get_connection() -> sqlite3.Connection:
 def initialize_database() -> None:
     conn = get_connection()
     try:
-        conn.executescript(
-            """
+        conn.executescript("""
             CREATE TABLE IF NOT EXISTS settings (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL,
@@ -115,8 +114,7 @@ def initialize_database() -> None:
                 stockout_probability REAL,
                 message TEXT
             );
-            """
-        )
+            """)
         conn.commit()
     finally:
         conn.close()
@@ -142,15 +140,18 @@ def set_setting(key: str, value: str) -> None:
 def get_setting(key: str) -> str | None:
     conn = get_connection()
     try:
-        row = conn.execute(
-            "SELECT value FROM settings WHERE key = ?", (key,)
-        ).fetchone()
+        row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
         return row["value"] if row else None
     finally:
         conn.close()
 
 
-def save_raw_staged_data(source_name: str, payload: dict[str, Any], status: str = "pending", error_message: str | None = None) -> None:
+def save_raw_staged_data(
+    source_name: str,
+    payload: dict[str, Any],
+    status: str = "pending",
+    error_message: str | None = None,
+) -> None:
     conn = get_connection()
     try:
         conn.execute(

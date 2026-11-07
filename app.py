@@ -417,9 +417,7 @@ def render_forecast_lazy(daily_sales: pd.DataFrame, horizon: int) -> None:
     job = get_forecast_job(job_id)
 
     button_label = (
-        "Regenerate Forecast"
-        if job and job["status"] == "READY"
-        else "Generate Forecast"
+        "Regenerate Forecast" if job and job["status"] == "READY" else "Generate Forecast"
     )
 
     if st.button(button_label, key="start_forecast"):
@@ -476,9 +474,7 @@ def render_forecast_lazy(daily_sales: pd.DataFrame, horizon: int) -> None:
         return
 
     selected_sku = st.selectbox("Select a SKU", sku_list)
-    sku_forecast = forecast_df[
-        forecast_df["sku"].astype(str) == selected_sku
-    ].copy()
+    sku_forecast = forecast_df[forecast_df["sku"].astype(str) == selected_sku].copy()
 
     if "date" in sku_forecast.columns:
         sku_forecast["date"] = pd.to_datetime(
@@ -682,18 +678,14 @@ def render_recommendations(inventory_df: pd.DataFrame) -> None:
 
     filter_col1, filter_col2, filter_col3 = st.columns(3)
 
-    urgency_options = ["All"] + sorted(
-        recommendations_df["urgency"].dropna().unique().tolist()
-    )
+    urgency_options = ["All"] + sorted(recommendations_df["urgency"].dropna().unique().tolist())
     selected_urgency = filter_col1.selectbox(
         "Urgency",
         urgency_options,
         key="recommendations_urgency",
     )
 
-    sku_options = ["All"] + sorted(
-        recommendations_df["sku"].dropna().astype(str).unique().tolist()
-    )
+    sku_options = ["All"] + sorted(recommendations_df["sku"].dropna().astype(str).unique().tolist())
     selected_sku = filter_col2.selectbox(
         "SKU",
         sku_options,
@@ -723,12 +715,7 @@ def render_recommendations(inventory_df: pd.DataFrame) -> None:
         filtered = filtered[filtered["sku"].astype(str) == selected_sku]
 
     if selected_supplier != "All":
-        supplier_series = (
-            filtered["supplier_code"]
-            .fillna("")
-            .astype(str)
-            .replace("", "Unknown")
-        )
+        supplier_series = filtered["supplier_code"].fillna("").astype(str).replace("", "Unknown")
         filtered = filtered[supplier_series == selected_supplier]
 
     high_count = int((filtered["urgency"] == "HIGH").sum())

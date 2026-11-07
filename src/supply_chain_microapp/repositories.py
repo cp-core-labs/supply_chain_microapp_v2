@@ -20,7 +20,9 @@ class BaseRepository:
     def fetch_by_id(self, table_key: str, value: str) -> dict[str, Any] | None:
         conn = get_connection()
         try:
-            row = conn.execute(f"SELECT * FROM {self.table_name} WHERE {table_key} = ?", (value,)).fetchone()
+            row = conn.execute(
+                f"SELECT * FROM {self.table_name} WHERE {table_key} = ?", (value,)
+            ).fetchone()
             return dict(row) if row else None
         finally:
             conn.close()

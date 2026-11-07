@@ -28,8 +28,7 @@ def initialize_risk_tables() -> None:
     """Crea las tablas de alertas e historial si todavía no existen."""
     conn = _connect()
     try:
-        conn.executescript(
-            """
+        conn.executescript("""
             CREATE TABLE IF NOT EXISTS risk_alerts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 scope TEXT NOT NULL,
@@ -61,8 +60,7 @@ def initialize_risk_tables() -> None:
 
             CREATE INDEX IF NOT EXISTS idx_risk_alert_events_alert_id
             ON risk_alert_events(alert_id);
-            """
-        )
+            """)
         conn.commit()
     finally:
         conn.close()
@@ -151,9 +149,7 @@ def assess_inventory_data(inventory_df: pd.DataFrame) -> pd.DataFrame:
     assessments = result.apply(_confidence_for_row, axis=1)
     result["confidence"] = assessments.apply(lambda item: item[0])
     result["confidence_score"] = assessments.apply(lambda item: item[1])
-    result["confidence_reasons"] = assessments.apply(
-        lambda item: " ".join(item[2])
-    )
+    result["confidence_reasons"] = assessments.apply(lambda item: " ".join(item[2]))
     return result
 
 
@@ -184,9 +180,7 @@ def build_risk_alerts(
     )
     valid_lead_times = lead_times[lead_times > 0]
     lead_time_threshold = (
-        float(valid_lead_times.quantile(0.90))
-        if not valid_lead_times.empty
-        else None
+        float(valid_lead_times.quantile(0.90)) if not valid_lead_times.empty else None
     )
 
     for _, row in assessed.iterrows():
@@ -272,9 +266,7 @@ def build_risk_alerts(
     if result.empty:
         return result
 
-    return result.drop_duplicates(
-        subset=["scope", "sku", "alert_type"]
-    ).reset_index(drop=True)
+    return result.drop_duplicates(subset=["scope", "sku", "alert_type"]).reset_index(drop=True)
 
 
 def _fingerprint(scope: str, sku: str, alert_type: str) -> str:
@@ -291,9 +283,7 @@ def persist_risk_alerts(
 
     current_alerts = alerts_df.copy()
     if not current_alerts.empty:
-        current_alerts = current_alerts[
-            current_alerts["scope"].astype(str) == str(scope)
-        ]
+        current_alerts = current_alerts[current_alerts["scope"].astype(str) == str(scope)]
 
     conn = _connect()
     try:
