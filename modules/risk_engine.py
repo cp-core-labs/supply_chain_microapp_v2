@@ -4,8 +4,7 @@ import pandas as pd
 
 
 def build_alerts(inventory_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Genera una tabla de alertas tipo semáforo:
+    """Genera una tabla de alertas tipo semáforo:
     - Verde: saludable
     - Amarillo: revisar
     - Rojo: urgente
@@ -48,8 +47,7 @@ def evaluate_what_if_scenario(
     lead_time_change_days: float = 3.0,
     service_level: float = 0.95,
 ) -> pd.DataFrame:
-    """
-    Analiza escenarios de 'qué pasaría si':
+    """Analiza escenarios de 'qué pasaría si':
     - cambio de demanda
     - expansión del lead time
     - ajuste del nivel de servicio
@@ -101,9 +99,7 @@ def evaluate_what_if_scenario(
 
 
 def build_risk_summary(alerts_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Resumen ejecutivo de riesgos por clasificación.
-    """
+    """Resumen ejecutivo de riesgos por clasificación."""
     if alerts_df.empty:
         return pd.DataFrame()
 

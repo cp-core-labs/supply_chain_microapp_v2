@@ -14,7 +14,6 @@ from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import streamlit as st
 
-from supply_chain_microapp.config import APP_CONFIG
 from supply_chain_microapp.storage import initialize_database
 
 from modules.forecast_jobs import (
@@ -41,12 +40,11 @@ except Exception:
 
 from data_generator import generate_synthetic_supply_chain_data
 from modules.data_processor import process_supply_chain_data
-from modules.forecaster import forecast_all_skus
 from modules.inventory_optimizer import build_inventory_plan
 from modules.risk_engine import build_alerts, build_risk_summary, evaluate_what_if_scenario
 
 st.set_page_config(
-    page_title="Supply Chain Micro App",
+    page_title="Supply Chain Micro App v2.0",
     page_icon="📦",
     layout="wide",
     initial_sidebar_state="expanded",

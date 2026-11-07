@@ -8,8 +8,7 @@ import pandas as pd
 
 
 def _service_level_z(service_level: float) -> float:
-    """
-    Aproxima el z-score para un nivel de servicio.
+    """Aproxima el z-score para un nivel de servicio.
     Para un SL del 95%, z ≈ 1.645
     """
     service_level = float(service_level)
@@ -30,21 +29,14 @@ def _service_level_z(service_level: float) -> float:
         return mapping[service_level]
 
     # Aproximación general para valores no tabulados
-    # Se basa en distribución normal estándar
-    # En producción se puede sustituir por scipy.stats.norm.ppf()
-    # pero aquí lo dejamos liviano y robusto.
     if service_level <= 0 or service_level >= 1:
         raise ValueError("El service level debe estar entre 0 y 1.")
 
-    # Aproximación rápida
     z = 0.0
     if service_level >= 0.5:
         z = 1.0
         for _ in range(100):
             z = z + 0.01
-            # No es exacto, pero suficiente para una UI analítica
-            # En producción mejor usar scipy.
-        # Ajuste más estable:
         z = (service_level - 0.5) * 20.0
         z = max(0.0, z)
     return max(0.0, z + 0.5)
@@ -57,12 +49,8 @@ def calculate_safety_stock(
     lead_time_std_days: float = 0.0,
     service_level: float = 0.95,
 ) -> float:
-    """
-    Calcula Safety Stock:
+    """Calcula Safety Stock:
     SS = z * sqrt( (LT * sigma_d)^2 + (d * sigma_LT)^2 )
-    donde:
-    - sigma_d = desviación estándar de demanda diaria
-    - sigma_LT = desviación estándar del lead time
     """
     avg_daily_demand = float(avg_daily_demand)
     demand_std = float(demand_std)
@@ -86,9 +74,7 @@ def calculate_reorder_point(
     lead_time_days: float,
     safety_stock: float,
 ) -> float:
-    """
-    ROP = demanda promedio durante el lead time + safety stock
-    """
+    """ROP = demanda promedio durante el lead time + safety stock"""
     return max(0.0, (avg_daily_demand * lead_time_days) + safety_stock)
 
 
@@ -97,9 +83,7 @@ def calculate_eoq(
     ordering_cost: float,
     holding_cost_per_unit_year: float,
 ) -> float:
-    """
-    EOQ = sqrt(2 * D * S / H)
-    """
+    """EOQ = sqrt(2 * D * S / H)"""
     annual_demand = float(annual_demand)
     ordering_cost = float(ordering_cost)
     holding_cost_per_unit_year = float(holding_cost_per_unit_year)
@@ -111,9 +95,7 @@ def calculate_eoq(
 
 
 def days_of_coverage(current_inventory: float, avg_daily_demand: float) -> float:
-    """
-    Días de cobertura: inventario actual / demanda promedio diaria
-    """
+    """Días de cobertura: inventario actual / demanda promedio diaria"""
     if avg_daily_demand <= 0:
         return 0.0
     return max(0.0, current_inventory / avg_daily_demand)
@@ -122,8 +104,7 @@ def days_of_coverage(current_inventory: float, avg_daily_demand: float) -> float
 def assign_abc_classification(
     df: pd.DataFrame, value_col: str = "annual_dollar_usage", sku_col: str = "sku"
 ) -> pd.DataFrame:
-    """
-    Asigna clase ABC usando Pareto:
+    """Asigna clase ABC usando Pareto:
     - A: 80% acumulado
     - B: siguiente 15%
     - C: restante 5%
@@ -140,7 +121,7 @@ def assign_abc_classification(
 
     cumulative = 0.0
     abc = []
-    for i, row in out.iterrows():
+    for _, row in out.iterrows():
         cumulative += float(row[value_col])
         share = cumulative / total
 
@@ -161,8 +142,7 @@ def assign_abc_classification(
 def assign_ved_classification(
     df: pd.DataFrame, criticality_col: str = "criticality", sku_col: str = "sku"
 ) -> pd.DataFrame:
-    """
-    Clasifica por criticidad tipo VED:
+    """Clasifica por criticidad tipo VED:
     - V = Vital
     - E = Essential
     - D = Desirable
@@ -197,10 +177,7 @@ def simulate_lead_time_uncertainty(
     n_simulations: int = 5000,
     seed: int = 42,
 ) -> Dict[str, float]:
-    """
-    Simulación Monte Carlo de demanda durante el lead time.
-    Mide la probabilidad de stockout y el inventario requerido.
-    """
+    """Simulación Monte Carlo de demanda durante el lead time."""
     rng = np.random.default_rng(seed)
 
     stockout_count = 0
@@ -211,7 +188,6 @@ def simulate_lead_time_uncertainty(
         lead_time_sample = max(0.0, rng.normal(lead_time_mean, lead_time_std))
         lead_times.append(lead_time_sample)
 
-        # Demanda durante el lead time
         average_demand = avg_daily_demand * lead_time_sample
         demand_variance = lead_time_sample * demand_std**2
         demand_sample = rng.normal(average_demand, math.sqrt(max(demand_variance, 0.0)))
@@ -238,17 +214,13 @@ def build_inventory_plan(
     ordering_cost: float = 150.0,
     holding_cost_pct: float = 0.22,
 ) -> pd.DataFrame:
-    """
-    Genera un plan operativo de inventario a nivel SKU.
-    Requiere que processed_data tenga 'sku_summary'.
-    """
+    """Genera un plan operativo de inventario a nivel SKU."""
     sku_summary = processed_data.get("sku_summary")
     if sku_summary is None:
         raise ValueError("processed_data no contiene 'sku_summary'.")
 
     df = sku_summary.copy()
 
-    # Columnas esperadas
     required_cols = [
         "sku",
         "product_name",
@@ -282,20 +254,16 @@ def build_inventory_plan(
     df["avg_lead_time_days"] = pd.to_numeric(df["avg_lead_time_days"], errors="coerce").fillna(0.0)
     df["lead_time_std_days"] = pd.to_numeric(df["lead_time_std_days"], errors="coerce").fillna(0.0)
     df["avg_unit_price"] = pd.to_numeric(df["avg_unit_price"], errors="coerce").fillna(0.0)
-    df["service_level_target"] = pd.to_numeric(df["service_level_target"], errors="coerce").fillna(
-        0.95
-    )
+    df["service_level_target"] = pd.to_numeric(
+        df["service_level_target"], errors="coerce"
+    ).fillna(0.95)
 
-    # Anual demand
     df["annual_demand"] = df["avg_daily_demand"] * 365.0
-
-    # Annual dollar usage
     df["annual_dollar_usage"] = df["annual_demand"] * df["avg_unit_price"]
 
     df = assign_abc_classification(df, value_col="annual_dollar_usage", sku_col="sku")
     df = assign_ved_classification(df, criticality_col="criticality", sku_col="sku")
 
-    # Safety Stock y ROP
     df["safety_stock"] = df.apply(
         lambda row: calculate_safety_stock(
             row["avg_daily_demand"],
@@ -316,7 +284,6 @@ def build_inventory_plan(
         axis=1,
     )
 
-    # EOQ
     df["holding_cost_per_unit_year"] = df["avg_unit_price"] * holding_cost_pct
     df["eoq"] = df.apply(
         lambda row: calculate_eoq(
@@ -327,16 +294,13 @@ def build_inventory_plan(
         axis=1,
     )
 
-    # Inventario promedio recomendado
     df["recommended_order_quantity"] = np.maximum(df["eoq"], df["reorder_point"] * 0.4)
 
-    # Cobertura
     df["days_of_coverage"] = df.apply(
         lambda row: days_of_coverage(row.get("reorder_point", 0.0), row["avg_daily_demand"]),
         axis=1,
     )
 
-    # Simulación Monte Carlo por SKU
     simulation_rows = []
     for _, row in df.iterrows():
         sim = simulate_lead_time_uncertainty(
@@ -365,9 +329,7 @@ def build_inventory_plan(
 
 
 def summarize_inventory_by_category(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Resumen de inventario por categoría.
-    """
+    """Resumen de inventario por categoría."""
     if df.empty:
         return pd.DataFrame()
 
@@ -387,7 +349,6 @@ def summarize_inventory_by_category(df: pd.DataFrame) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    # Ejemplo simple de uso
     d = {
         "sku_summary": pd.DataFrame(
             [
@@ -403,7 +364,6 @@ if __name__ == "__main__":
                     "service_level_target": 0.95,
                     "criticality": "Vital",
                     "reorder_point": 1100,
-                    "avg_unit_price": 35,
                 },
                 {
                     "sku": "SKU-002",
@@ -417,7 +377,6 @@ if __name__ == "__main__":
                     "service_level_target": 0.92,
                     "criticality": "Essential",
                     "reorder_point": 700,
-                    "avg_unit_price": 18,
                 },
             ]
         )

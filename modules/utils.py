@@ -60,7 +60,7 @@ def series_is_valid(series: pd.Series) -> bool:
 
 def percentile_interval(
     values: np.ndarray, lower_pct: float = 0.10, upper_pct: float = 0.90
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[Any, Any]:
     arr = np.asarray(values, dtype=float)
     if arr.size == 0:
         return arr, arr
