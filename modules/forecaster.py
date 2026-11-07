@@ -296,7 +296,7 @@ def forecast_sku(
     future_forecast = _fit_model_and_predict(selected_model, series, horizon)
 
     if "date" in sku_df.columns and not sku_df["date"].isna().all():
-        history_dates = pd.to_datetime(sku_df["date"])
+        history_dates = pd.DatetimeIndex(pd.to_datetime(sku_df["date"]))
     else:
         history_dates = pd.date_range(start="2023-01-01", periods=len(series), freq="D")
 
