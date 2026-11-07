@@ -1,9 +1,38 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+
+# Añadir la carpeta 'src' al sys.path para resolver las importaciones del paquete
+ROOT_DIR = Path(__file__).resolve().parent
+SRC_DIR = ROOT_DIR / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from concurrent.futures import ThreadPoolExecutor
 
 import pandas as pd
 import streamlit as st
+
+from supply_chain_microapp.config import APP_CONFIG
+from supply_chain_microapp.storage import initialize_database
+
+from modules.forecast_jobs import (
+    build_forecast_job_id,
+    forecast_dataframe_from_job,
+    get_forecast_job,
+    initialize_forecast_jobs,
+    submit_forecast_job,
+)
+from modules.risk_monitor import (
+    build_risk_alerts,
+    load_open_risk_alerts,
+    persist_risk_alerts,
+)
+from modules.recommendation_engine import build_recommendations
+
+initialize_database()
+initialize_forecast_jobs()
 
 try:
     import plotly.express as px
@@ -25,128 +54,216 @@ st.set_page_config(
 
 
 # ==========================================================
-# Premium CSS / compact & visible header
+# Premium CSS / Supply Chain Control Tower Theme (v2.0.0)
 # ==========================================================
 st.markdown(
     """
     <style>
-        /* General premium background */
-        html, body, [class*="css"] {
-            background: #0b1220;
-            color: #e2e8f0;
+        :root {
+            --navy: #102A43;
+            --navy-soft: #173B57;
+            --teal: #0F766E;
+            --teal-light: #CCFBF1;
+            --ink: #172B4D;
+            --muted: #627D98;
+            --canvas: #F3F6FA;
+            --line: #D9E2EC;
+            --white: #FFFFFF;
         }
 
-        .main {
-            background: linear-gradient(180deg, #0b1220 0%, #101827 100%);
+        /* Page */
+        .stApp {
+            background: var(--canvas);
+            color: var(--ink);
+        }
+
+        [data-testid="stHeader"] {
+            background: transparent;
         }
 
         .block-container {
-            padding-top: 1.5rem !important;
-            padding-left: 1.5rem !important;
-            padding-right: 1.5rem !important;
+            max-width: 1440px;
+            padding-top: 2rem;
+            padding-bottom: 3rem;
         }
 
-        /* Visible and compact card header */
+        /* Sidebar */
+        [data-testid="stSidebar"] {
+            background: linear-gradient(180deg, var(--navy) 0%, #0B1F33 100%);
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        [data-testid="stSidebar"] * {
+            color: #F3F7FA;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+            color: #C5D3E0;
+        }
+
+        [data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {
+            color: #E6EDF3;
+            font-weight: 600;
+        }
+
+        /* Main page heading */
         .premium-header {
-            background: rgba(15, 23, 42, 0.92);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            box-shadow: 0 4px 20px rgba(2, 6, 23, 0.3);
-            padding: 1rem 1.2rem;
-            border-radius: 12px;
-            margin-bottom: 1rem;
+            position: relative;
+            overflow: hidden;
+            padding: 1.7rem 2rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(15, 118, 110, 0.12);
+            border-radius: 20px;
+            background:
+                radial-gradient(circle at 90% 15%, rgba(45, 212, 191, 0.24), transparent 28%),
+                linear-gradient(120deg, #FFFFFF 0%, #EAF7F5 100%);
+            box-shadow: 0 12px 30px rgba(16, 42, 67, 0.07);
+        }
+
+        .premium-header::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 6px;
+            background: var(--teal);
+        }
+
+        .premium-eyebrow {
+            margin-bottom: 0.45rem;
+            color: var(--teal);
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
         }
 
         .premium-title {
             margin: 0;
-            font-size: 1.6rem !important;
-            line-height: 1.2;
-            letter-spacing: -0.02em;
-            font-weight: 700;
-            color: #f8fafc;
+            color: var(--navy);
+            font-size: clamp(1.55rem, 3vw, 2.15rem);
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            line-height: 1.15;
         }
 
         .premium-subtitle {
-            margin-top: 0.25rem;
-            color: #cbd5e1;
-            font-size: 0.88rem;
-            font-weight: 400;
+            margin-top: 0.55rem;
+            max-width: 760px;
+            color: var(--muted);
+            font-size: 0.98rem;
+            line-height: 1.5;
         }
 
-        /* KPI Cards */
-        [data-testid="metric-container"] {
-            background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(17, 24, 39, 0.94));
-            border: 1px solid rgba(148, 163, 184, 0.18);
+        /* Section navigation buttons */
+        div[data-testid="stHorizontalBlock"] button {
+            min-height: 2.7rem;
+            border: 1px solid var(--line);
+            border-radius: 11px;
+            background: var(--white);
+            color: var(--navy);
+            font-weight: 700;
+            transition: all 150ms ease;
+        }
+
+        div[data-testid="stHorizontalBlock"] button:hover {
+            border-color: var(--teal);
+            color: var(--teal);
+            box-shadow: 0 4px 12px rgba(15, 118, 110, 0.10);
+        }
+
+        div[data-testid="stHorizontalBlock"] button[kind="primary"] {
+            border-color: var(--teal);
+            background: var(--teal);
+            color: white;
+        }
+
+        /* KPI cards */
+        [data-testid="stMetric"] {
+            min-height: 126px;
+            padding: 1rem 1.15rem;
+            border: 1px solid var(--line);
             border-radius: 16px;
-            box-shadow: 0 18px 28px rgba(2, 6, 23, 0.18);
-            padding: 1rem 1.1rem;
+            background: var(--white);
+            box-shadow: 0 6px 18px rgba(16, 42, 67, 0.045);
         }
 
-        [data-testid="metric-container"] label {
-            color: #cbd5e1 !important;
-            font-size: 0.82rem !important;
-            font-weight: 600 !important;
+        [data-testid="stMetricLabel"] {
+            color: var(--muted);
+            font-size: 0.82rem;
+            font-weight: 700;
         }
 
-        [data-testid="metric-container"] div {
-            color: #f8fafc !important;
-            font-size: 1.7rem !important;
-            font-weight: 800 !important;
+        [data-testid="stMetricValue"] {
+            color: var(--navy);
+            font-size: 1.8rem;
+            font-weight: 800;
         }
 
-        /* Tabs and tables */
-        .stDataFrame {
-            border-radius: 16px;
+        /* Headings and text */
+        h1, h2, h3, h4 {
+            color: var(--navy) !important;
+            letter-spacing: -0.025em;
+        }
+
+        [data-testid="stMarkdownContainer"] p {
+            color: var(--ink);
+        }
+
+        /* Buttons */
+        .stButton button,
+        .stDownloadButton button {
+            border-radius: 10px;
+            font-weight: 700;
+            transition: all 150ms ease;
+        }
+
+        .stButton button[kind="primary"],
+        .stDownloadButton button {
+            border-color: var(--teal);
+            background: var(--teal);
+            color: white;
+        }
+
+        .stButton button[kind="primary"]:hover,
+        .stDownloadButton button:hover {
+            border-color: #0B5F59;
+            background: #0B5F59;
+            color: white;
+        }
+
+        /* Data tables and alerts */
+        [data-testid="stDataFrame"],
+        [data-testid="stTable"] {
             overflow: hidden;
-            border: 1px solid rgba(148, 163, 184, 0.18);
-            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: var(--white);
         }
 
-        .stDataFrame > div {
-            background: rgba(15, 23, 42, 0.7);
-        }
-
-        div[data-testid="stHorizontalBlock"] > div {
-            background: transparent;
-        }
-
-        h1, h2, h3, h4, h5 {
-            color: #f8fafc !important;
-        }
-
-        .stMarkdown {
-            color: #e2e8f0;
-        }
-
-        .stAlert {
+        [data-testid="stAlert"] {
             border-radius: 12px;
         }
 
-        .stSelectbox label, .stSlider label {
-            color: #e2e8f0 !important;
-            font-weight: 600;
+        /* Inputs */
+        [data-testid="stSelectbox"] label,
+        [data-testid="stSlider"] label,
+        [data-testid="stTextInput"] label {
+            color: var(--navy);
+            font-weight: 700;
         }
 
-        .stSidebar {
-            background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
-            border-right: 1px solid rgba(148, 163, 184, 0.2);
-        }
+        /* Responsive spacing */
+        @media (max-width: 768px) {
+            .block-container {
+                padding: 1rem 1rem 2rem;
+            }
 
-        .stSidebar .block-container {
-            padding-top: 1rem !important;
-        }
-
-        .stSidebar label, .stSidebar .stMarkdown p {
-            color: #e2e8f0 !important;
-        }
-
-        .stSidebar .stSlider [data-testid="stBaseSlider"] {
-            background: rgba(15, 23, 42, 0.75);
-        }
-
-        .content-wrapper {
-            padding-top: 0.3rem;
+            .premium-header {
+                padding: 1.3rem 1.25rem;
+                border-radius: 15px;
+            }
         }
     </style>
     """,
@@ -176,9 +293,13 @@ def load_or_generate_data() -> dict:
     )
 
 
-@st.cache_data
-def compute_forecast_pipeline(daily_sales: pd.DataFrame, horizon: int = 30) -> pd.DataFrame:
-    return forecast_all_skus(daily_sales, horizon=horizon)
+@st.cache_resource
+def get_forecast_executor() -> ThreadPoolExecutor:
+    """A single shared executor during the Streamlit process lifecycle."""
+    return ThreadPoolExecutor(
+        max_workers=1,
+        thread_name_prefix="forecast",
+    )
 
 
 @st.cache_data
@@ -222,14 +343,14 @@ def render_overview(inventory_df: pd.DataFrame):
             x="abc_class",
             y="sku_count",
             color="abc_class",
-            color_discrete_sequence=["#3b82f6", "#22c55e", "#f59e0b"],
+            color_discrete_sequence=["#0F766E", "#22c55e", "#f59e0b"],
             title="ABC Classification",
         )
         fig_abc.update_layout(
-            paper_bgcolor="rgba(15, 23, 42, 0.8)",
-            plot_bgcolor="rgba(15, 23, 42, 0.8)",
-            font={"color": "#e2e8f0"},
-            legend={"font": {"color": "#e2e8f0"}},
+            paper_bgcolor="rgba(255, 255, 255, 1)",
+            plot_bgcolor="rgba(255, 255, 255, 1)",
+            font={"color": "#172B4D"},
+            legend={"font": {"color": "#172B4D"}},
         )
         col_a.plotly_chart(fig_abc, use_container_width=True)
     else:
@@ -253,10 +374,10 @@ def render_overview(inventory_df: pd.DataFrame):
             title="Operational Risk by Alert Level",
         )
         fig_risk.update_layout(
-            paper_bgcolor="rgba(15, 23, 42, 0.8)",
-            plot_bgcolor="rgba(15, 23, 42, 0.8)",
-            font={"color": "#e2e8f0"},
-            legend={"font": {"color": "#e2e8f0"}},
+            paper_bgcolor="rgba(255, 255, 255, 1)",
+            plot_bgcolor="rgba(255, 255, 255, 1)",
+            font={"color": "#172B4D"},
+            legend={"font": {"color": "#172B4D"}},
         )
         col_b.plotly_chart(fig_risk, use_container_width=True)
     else:
@@ -285,69 +406,129 @@ def render_overview(inventory_df: pd.DataFrame):
     st.dataframe(display_df, use_container_width=True, height=420)
 
 
-def render_forecast_tab(processed_data: dict, horizon: int):
-    daily_sales = processed_data["daily_sales"]
-
-    if "forecast_df" not in st.session_state:
-        st.session_state.forecast_df = None
-
-    if "forecast_generated" not in st.session_state:
-        st.session_state.forecast_generated = False
+def render_forecast_lazy(daily_sales: pd.DataFrame, horizon: int) -> None:
+    """Displays the forecast and triggers it only when requested by the user."""
+    initialize_forecast_jobs()
 
     st.subheader("Demand Forecast")
+    st.caption(f"Selected Horizon: {horizon} days")
 
-    col1, col2 = st.columns([3, 1])
-    with col2:
-        if st.button("Generate Forecast", use_container_width=True):
-            with st.spinner("Calculating forecasts for all SKUs..."):
-                st.session_state.forecast_df = compute_forecast_pipeline(daily_sales, horizon=horizon)
-                st.session_state.forecast_generated = True
-                st.rerun()
+    job_id = build_forecast_job_id(daily_sales, horizon)
+    job = get_forecast_job(job_id)
 
-        if st.session_state.forecast_generated:
-            if st.button("Refresh Forecast", use_container_width=True):
-                with st.spinner("Updating forecasts..."):
-                    st.session_state.forecast_df = compute_forecast_pipeline(daily_sales, horizon=horizon)
-                    st.session_state.forecast_generated = True
-                    st.rerun()
+    button_label = (
+        "Regenerate Forecast"
+        if job and job["status"] == "READY"
+        else "Generate Forecast"
+    )
 
-    if not st.session_state.forecast_generated or st.session_state.forecast_df is None:
-        st.info("Click 'Generate Forecast' to calculate demand per SKU on demand.")
+    if st.button(button_label, key="start_forecast"):
+        try:
+            submit_forecast_job(
+                daily_sales=daily_sales,
+                horizon=horizon,
+                executor=get_forecast_executor(),
+                force=bool(job and job["status"] == "READY"),
+            )
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Failed to start forecast: {exc}")
+
+    # Read status back after starting the job
+    job = get_forecast_job(job_id)
+
+    if not job:
+        st.info("Click «Generate Forecast» to start calculation.")
         return
 
-    forecast_df = st.session_state.forecast_df
-    sku_list = sorted(forecast_df["sku"].unique())
+    status = job["status"]
+
+    if status in {"PENDING", "COMPUTING"}:
+        st.info(
+            "Forecast is currently being calculated in the background. "
+            "You can navigate to other sections and return here."
+        )
+        if st.button("Refresh Status", key="refresh_forecast_status"):
+            st.rerun()
+        return
+
+    if status == "FAILED":
+        st.error(f"Forecast calculation failed: {job.get('error_message')}")
+        st.caption("You can try again using the button above.")
+        return
+
+    if status != "READY":
+        st.warning(f"Unrecognized forecast status: {status}")
+        return
+
+    forecast_df = forecast_dataframe_from_job(job)
+    if forecast_df.empty:
+        st.warning("The job finished, but there are no results to display.")
+        return
+
+    if "sku" not in forecast_df.columns:
+        st.error("The forecast result does not contain the 'sku' column.")
+        return
+
+    sku_list = sorted(forecast_df["sku"].dropna().astype(str).unique())
+    if not sku_list:
+        st.warning("No SKUs available in the result.")
+        return
+
     selected_sku = st.selectbox("Select a SKU", sku_list)
+    sku_forecast = forecast_df[
+        forecast_df["sku"].astype(str) == selected_sku
+    ].copy()
 
-    sku_forecast = forecast_df[forecast_df["sku"] == selected_sku].sort_values("date")
+    if "date" in sku_forecast.columns:
+        sku_forecast["date"] = pd.to_datetime(
+            sku_forecast["date"],
+            errors="coerce",
+        )
+        sku_forecast = sku_forecast.dropna(subset=["date"]).sort_values("date")
+
     if sku_forecast.empty:
-        st.warning("No forecast data available for this SKU.")
+        st.warning("No forecast available for this SKU.")
         return
 
-    if px is not None:
-        fig = px.line(
-            sku_forecast,
-            x="date",
-            y=["forecast_units", "lower_bound", "upper_bound"],
-            title=f"Forecast for {selected_sku}",
-            labels={"date": "Date", "value": "Units"},
-        )
-        fig.update_layout(
-            paper_bgcolor="rgba(15, 23, 42, 0.8)",
-            plot_bgcolor="rgba(15, 23, 42, 0.8)",
-            font={"color": "#e2e8f0"},
-            legend={"font": {"color": "#e2e8f0"}},
-        )
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.line_chart(
-            sku_forecast.set_index("date")[["forecast_units", "lower_bound", "upper_bound"]]
-        )
+    chart_columns = [
+        column
+        for column in ("forecast_units", "lower_bound", "upper_bound")
+        if column in sku_forecast.columns
+    ]
 
+    if "date" in sku_forecast.columns and chart_columns:
+        if px is not None:
+            fig = px.line(
+                sku_forecast,
+                x="date",
+                y=chart_columns,
+                title=f"Forecast for {selected_sku}",
+                labels={"date": "Date", "value": "Units"},
+            )
+            fig.update_layout(
+                paper_bgcolor="rgba(255, 255, 255, 1)",
+                plot_bgcolor="rgba(255, 255, 255, 1)",
+                font={"color": "#172B4D"},
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.line_chart(sku_forecast.set_index("date")[chart_columns])
+
+    display_columns = [
+        column
+        for column in (
+            "date",
+            "sku",
+            "forecast_units",
+            "lower_bound",
+            "upper_bound",
+            "selected_model",
+        )
+        if column in sku_forecast.columns
+    ]
     st.dataframe(
-        sku_forecast.tail(15)[
-            ["date", "sku", "forecast_units", "lower_bound", "upper_bound", "selected_model"]
-        ],
+        sku_forecast[display_columns].tail(30),
         use_container_width=True,
     )
 
@@ -401,6 +582,22 @@ def render_risk(alerts_df: pd.DataFrame):
     if not risk_summary.empty:
         st.dataframe(risk_summary, use_container_width=True)
 
+    st.markdown("### Open Alerts (Persisted)")
+    persisted_alerts = load_open_risk_alerts(scope="default")
+    if persisted_alerts.empty:
+        st.success("No open alerts.")
+    else:
+        if "provisional" in persisted_alerts.columns:
+            persisted_alerts["provisional"] = persisted_alerts["provisional"].map(
+                {0: "No", 1: "Yes"}
+            )
+        st.dataframe(
+            persisted_alerts,
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    st.markdown("### SKU Operating Plan Alerts")
     st.dataframe(
         alerts_df[
             [
@@ -417,7 +614,7 @@ def render_risk(alerts_df: pd.DataFrame):
             ]
         ].sort_values("risk_score", ascending=False),
         use_container_width=True,
-        height=500,
+        height=400,
     )
 
 
@@ -467,6 +664,94 @@ def render_scenarios(inventory_df: pd.DataFrame):
         ].sort_values("scenario_risk_score", ascending=False),
         use_container_width=True,
         height=500,
+    )
+
+
+def render_recommendations(inventory_df: pd.DataFrame) -> None:
+    st.subheader("Action Recommendations")
+    st.caption(
+        "Decision support only: review the data and approve actions "
+        "according to your operational process."
+    )
+
+    recommendations_df = build_recommendations(inventory_df)
+
+    if recommendations_df.empty:
+        st.info("No recommendations are available.")
+        return
+
+    filter_col1, filter_col2, filter_col3 = st.columns(3)
+
+    urgency_options = ["All"] + sorted(
+        recommendations_df["urgency"].dropna().unique().tolist()
+    )
+    selected_urgency = filter_col1.selectbox(
+        "Urgency",
+        urgency_options,
+        key="recommendations_urgency",
+    )
+
+    sku_options = ["All"] + sorted(
+        recommendations_df["sku"].dropna().astype(str).unique().tolist()
+    )
+    selected_sku = filter_col2.selectbox(
+        "SKU",
+        sku_options,
+        key="recommendations_sku",
+    )
+
+    supplier_options = ["All"] + sorted(
+        recommendations_df["supplier_code"]
+        .fillna("")
+        .astype(str)
+        .replace("", "Unknown")
+        .unique()
+        .tolist()
+    )
+    selected_supplier = filter_col3.selectbox(
+        "Supplier",
+        supplier_options,
+        key="recommendations_supplier",
+    )
+
+    filtered = recommendations_df.copy()
+
+    if selected_urgency != "All":
+        filtered = filtered[filtered["urgency"] == selected_urgency]
+
+    if selected_sku != "All":
+        filtered = filtered[filtered["sku"].astype(str) == selected_sku]
+
+    if selected_supplier != "All":
+        supplier_series = (
+            filtered["supplier_code"]
+            .fillna("")
+            .astype(str)
+            .replace("", "Unknown")
+        )
+        filtered = filtered[supplier_series == selected_supplier]
+
+    high_count = int((filtered["urgency"] == "HIGH").sum())
+    medium_count = int((filtered["urgency"] == "MEDIUM").sum())
+
+    metric1, metric2, metric3 = st.columns(3)
+    metric1.metric("Recommendations", len(filtered))
+    metric2.metric("High urgency", high_count)
+    metric3.metric("Medium urgency", medium_count)
+
+    st.dataframe(
+        filtered,
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    csv_data = filtered.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        label="Download recommendations (.csv)",
+        data=csv_data,
+        file_name="supply_chain_recommendations.csv",
+        mime="text/csv",
+        key="download_recommendations",
     )
 
 
@@ -529,18 +814,29 @@ def main():
     if "active_section" not in st.session_state:
         st.session_state.active_section = "Overview"
 
-    # Visible and structured header
+    # Control Tower header (v2.0)
     st.markdown(
         """
         <div class="premium-header">
-            <div class="premium-title">Supply Chain &amp; Inventory Optimization Platform</div>
-            <div class="premium-subtitle">Operational intelligence for demand planning, stock risk and inventory strategy</div>
+            <div class="premium-eyebrow">Supply chain intelligence · v2.0</div>
+            <div class="premium-title">Plan with clarity. Respond with confidence.</div>
+            <div class="premium-subtitle">
+                Demand, inventory and operational risk in one decision-support workspace.
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    sections = ["Overview", "Forecast", "Inventory", "Risk", "Scenarios", "Export"]
+    sections = [
+        "Overview",
+        "Forecast",
+        "Inventory",
+        "Risk",
+        "Scenarios",
+        "Recommendations",
+        "Export",
+    ]
     cols = st.columns(len(sections))
 
     for i, item in enumerate(sections):
@@ -559,16 +855,28 @@ def main():
     inventory_df = build_alerts(raw_inventory_df)
     alerts_df = inventory_df
 
+    # Sprint 3: Risk alerts assessment and persistence
+    risk_alerts_df = build_risk_alerts(
+        inventory_df,
+        scope="default",
+    )
+    persist_risk_alerts(
+        risk_alerts_df,
+        scope="default",
+    )
+
     if active_section == "Overview":
         render_overview(inventory_df)
     elif active_section == "Forecast":
-        render_forecast_tab(processed_data, horizon=forecast_horizon)
+        render_forecast_lazy(daily_sales, forecast_horizon)
     elif active_section == "Inventory":
         render_inventory(inventory_df)
     elif active_section == "Risk":
         render_risk(alerts_df)
     elif active_section == "Scenarios":
         render_scenarios(inventory_df)
+    elif active_section == "Recommendations":
+        render_recommendations(inventory_df)
     elif active_section == "Export":
         render_export(alerts_df)
 
